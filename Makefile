@@ -33,7 +33,7 @@ NVME_DPKG_VERSION=1~`lsb_release -sc`
 OBJS := argconfig.o suffix.o parser.o nvme-print.o nvme-ioctl.o \
 	nvme-lightnvm.o fabrics.o
 
-nvme: nvme.c ./linux/nvme.h $(OBJS) NVME-VERSION-FILE
+nvme: nvme.c nvme.h $(OBJS) NVME-VERSION-FILE
 	$(CC) $(CPPFLAGS) $(CFLAGS) nvme.c $(LDFLAGS) -o $(NVME) $(OBJS)
 
 nvme.o: nvme.c nvme.h nvme-print.h nvme-ioctl.h argconfig.h suffix.h
