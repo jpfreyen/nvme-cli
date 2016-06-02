@@ -36,8 +36,11 @@ OBJS := argconfig.o suffix.o parser.o nvme-print.o nvme-ioctl.o \
 nvme: nvme.c ./linux/nvme.h $(OBJS) NVME-VERSION-FILE
 	$(CC) $(CPPFLAGS) $(CFLAGS) nvme.c $(LDFLAGS) -o $(NVME) $(OBJS)
 
-nvme-ioctl.o: nvme-ioctl.c nvme-ioctl.h
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c nvme-ioctl.c
+nvme.o: nvme.c nvme.h nvme-print.h nvme-ioctl.h argconfig.h suffix.h
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $<
+
+%.o: %.c %.h
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $<
 
 fabrics.o: fabrics.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c fabrics.c
@@ -47,15 +50,6 @@ parser.o: parser.c
 
 argconfig.o: argconfig.c argconfig.h suffix.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c argconfig.c
-
-suffix.o: suffix.c suffix.h
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c suffix.c
-
-nvme-print.o: nvme-print.c nvme-print.h
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c nvme-print.c
-
-nvme-lightnvm.o: nvme-lightnvm.h nvme-lightnvm.h
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c nvme-lightnvm.c
 
 doc: $(NVME)
 	$(MAKE) -C Documentation
