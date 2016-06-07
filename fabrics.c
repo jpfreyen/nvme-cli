@@ -274,6 +274,22 @@ static void print_discovery_log(struct nvmf_disc_rsp_page_hdr *log, int numrec)
 
 		printf("trtype:  ");
 		switch(e->trtype) {
+		case NVMF_TRTYPE_RDMA:
+			printf("rdma\n");
+			break;
+		case NVMF_TRTYPE_FC:
+			printf("fc\n");
+			break;
+		case NVMF_TRTYPE_LOOP:
+			printf("loop\n");
+			break;
+		default:
+			printf("unknown\n");
+			break;
+		}
+
+		printf("adrfam:  ");
+		switch(e->adrfam) {
 		case NVMF_ADDR_FAMILY_IP4:
 			printf("ipv4\n");
 			break;
@@ -285,22 +301,6 @@ static void print_discovery_log(struct nvmf_disc_rsp_page_hdr *log, int numrec)
 			break;
 		case NVMF_ADDR_FAMILY_FC:
 			printf("fc\n");
-			break;
-		default:
-			printf("unknown\n");
-			break;
-		}
-
-		printf("adrfam:  ");
-		switch(e->adrfam) {
-		case NVMF_TRTYPE_RDMA:
-			printf("rdma\n");
-			break;
-		case NVMF_TRTYPE_FC:
-			printf("fc\n");
-			break;
-		case NVMF_TRTYPE_LOOP:
-			printf("loop\n");
 			break;
 		default:
 			printf("unknown\n");
