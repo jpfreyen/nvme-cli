@@ -1,14 +1,47 @@
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 #include "plugin.h"
 #include "argconfig.h"
+
+static int version(struct plugin *plugin)
+{
+	struct program *prog = plugin->parent;
+
+	if (plugin->name)
+		printf("%s %s version %s\n", prog->name, plugin->name, prog->version);
+	else
+		printf("%s version %s\n", prog->name, prog->version);
+	return 0;
+}
+
+static int help(int argc, char **argv, struct plugin *plugin)
+{
+	char man[0x100];
+
+	if (argc == 1) {
+		general_help(plugin);
+		return 0;
+	}
+
+	sprintf(man, "%s-%s", plugin->name, argv[1]);
+	if (execlp("man", "man", man, (char *)NULL)) {
+		perror(argv[1]);
+		exit(errno);
+	}
+	return 0;
+}
 
 void usage(struct plugin *plugin)
 {
 	struct program *prog = plugin->parent;
 
-	printf("usage: %s %s\n", prog->name, prog->usage);
+	if (plugin->name)
+		printf("usage: %s %s %s\n", prog->name, plugin->name, prog->usage);
+	else
+		printf("usage: %s %s\n", prog->name, prog->usage);
 }
 
 void general_help(struct plugin *plugin)
@@ -22,14 +55,16 @@ void general_help(struct plugin *plugin)
 	usage(plugin);
 
 	printf("\n");
-	print_word_wrapped(plugin->desc, 0, 0);
+	print_word_wrapped(prog->desc, 0, 0);
 
-	printf("The following are all implemented sub-commands:\n");
+	printf("\n\nThe following are all implemented sub-commands:\n");
 	while (plugin->commands[i]) {
 		printf("  %-*s %s\n", 15, plugin->commands[i]->name,
 					plugin->commands[i]->help);
 		i++;
 	}
+	printf("  %-*s %s\n", 15, "version", "Shows the program version");
+	printf("  %-*s %s\n", 15, "help", "Display this help");
 
 	printf("\n");
 
@@ -61,12 +96,17 @@ int handle_plugin(int argc, char **argv, struct plugin *plugin)
 	unsigned i = 0;
 	struct command *cmd;
 	char *str = argv[0];
-	char usage[0x100];
+	char use[0x100];
 
 	struct plugin *extension;
 
-	sprintf(usage, "%s %s <device> [OPTIONS]", plugin->name, str);
-	argconfig_append_usage(usage);
+	if (!argc) {
+		usage(plugin);
+		return 0;
+	}
+
+	sprintf(use, "%s %s <device> [OPTIONS]", plugin->name, str);
+	argconfig_append_usage(use);
 
 	/* translate --help and --version into commands */
 	while (*str == '-')
@@ -76,6 +116,10 @@ int handle_plugin(int argc, char **argv, struct plugin *plugin)
 		cmd = plugin->commands[i];
 		i++;
 
+		if (!strcmp(str, "help"))
+			return help(argc, argv, plugin);
+		if (!strcmp(str, "version"))
+			return version(plugin);
 		if (strcmp(str, cmd->name))
 			continue;
 

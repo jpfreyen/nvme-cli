@@ -17,7 +17,7 @@ static struct plugin intel_nvme = {
 	.next = NULL,
 	.commands = commands,
 };
- 
+
 static void init() __attribute__((constructor));
 static void init()
 {
