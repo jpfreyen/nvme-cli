@@ -63,7 +63,7 @@
 
 static int fd;
 static struct stat nvme_stat;
-static const char *devicename;
+const char *devicename;
 
 static const char nvme_version_string[] = NVME_VERSION;
 
@@ -132,11 +132,12 @@ static void get_dev(int argc, char **argv)
 	open_dev((const char *)argv[optind]);
 }
 
-static void parse_and_open(int argc, char **argv, const char *desc,
+int parse_and_open(int argc, char **argv, const char *desc,
 	const struct argconfig_commandline_options *clo, void *cfg, size_t size)
 {
 	argconfig_parse(argc, argv, desc, clo, cfg, size);
 	get_dev(argc, argv);
+	return fd;
 }
 
 const char *output_format = "Output format: normal|json|binary";
@@ -2909,7 +2910,7 @@ static int help(int argc, char **argv, struct command *command, struct plugin *p
 	return 0;
 }
 
-void register_extention(struct plugin *plugin)
+void register_extension(struct plugin *plugin)
 {
 	plugin->parent = &nvme;
 
