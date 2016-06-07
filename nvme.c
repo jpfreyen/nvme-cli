@@ -24,6 +24,8 @@
  * This program uses NVMe IOCTLs to run native nvme commands to a device.
  */
 
+#include <dirent.h>
+#include <dlfcn.h>
 #include <endian.h>
 #include <errno.h>
 #include <getopt.h>
@@ -64,6 +66,7 @@
 static int fd;
 static struct stat nvme_stat;
 const char *devicename;
+static char plugin_dir[4096];
 
 static const char nvme_version_string[] = NVME_VERSION;
 
@@ -2594,6 +2597,72 @@ void register_extension(struct plugin *plugin)
 	nvme.extensions->tail = plugin;
 }
 
+static struct plugin *load_plugin(struct dirent *nvme_plugin)
+{
+	void *dlhandle;
+	struct plugin *plugin;
+	char ppath[4096], sym[256];
+
+	memset(sym, 0, sizeof(sym));
+	memset(ppath, 0, sizeof(ppath));
+	strcpy(ppath, plugin_dir);
+	strcat(ppath, nvme_plugin->d_name);
+
+	strcpy(sym, nvme_plugin->d_name);
+	*strchr(sym, '.') = '\0';
+
+	dlerror();
+	dlhandle = dlopen(ppath, RTLD_LAZY);
+	if (!dlhandle)
+		return NULL;
+
+	plugin = dlsym(dlhandle, sym);
+	if (!plugin) {
+		dlclose(dlhandle);
+		return NULL;
+	}
+	return plugin;
+}
+
+static bool is_shared(const char *str)
+{
+       static const char *so = ".so";
+       int lstr = strlen(str);
+       int lsuf = strlen(so);
+
+       if (lsuf > lstr)
+               return 0;
+
+       return strncmp(str + lstr - lsuf, so, lsuf) == 0;
+}
+
+static void load_plugins()
+{
+	struct plugin *plugin;
+	struct dirent *cur;
+	DIR *plugins;
+
+	readlink("/proc/self/exe", plugin_dir, sizeof(plugin_dir));
+	*(strrchr(plugin_dir, '/') + 1) = '\0';
+	strcat(plugin_dir, "nvme-plugins/");
+
+	plugins = opendir(plugin_dir);
+	if (!plugins)
+	        return;
+
+	while ((cur = readdir(plugins)) != NULL) {
+		if (cur->d_type != DT_REG)
+			continue;
+		if (!is_shared(cur->d_name))
+			continue;
+
+		plugin = load_plugin(cur);
+		if (plugin)
+			register_extension(plugin);
+	}
+	closedir(plugins);
+}
+
 int main(int argc, char **argv)
 {
 	int ret;
@@ -2602,8 +2671,9 @@ int main(int argc, char **argv)
 	}
 	setlocale(LC_ALL, "");
 
-	nvme.extensions->parent = &nvme;
+	load_plugins();
 
+	nvme.extensions->parent = &nvme;
 	ret = handle_plugin(argc - 1, &argv[1], nvme.extensions);
 
 	if (ret == -1)
