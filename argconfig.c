@@ -162,16 +162,8 @@ int argconfig_parse(int argc, char *argv[], const char *program_desc,
 			long_opts[option_index].name = s->option;
 			long_opts[option_index].has_arg = s->argument_type;
 
-			if (s->argument_type == no_argument
-			    && s->default_value != NULL) {
-				value_addr = (void *)(char *)s->default_value;
-
-				long_opts[option_index].flag = value_addr;
-				long_opts[option_index].val = 1;
-			} else {
-				long_opts[option_index].flag = NULL;
-				long_opts[option_index].val = 0;
-			}
+			long_opts[option_index].flag = NULL;
+			long_opts[option_index].val = 0;
 		}
 		option_index++;
 	}
@@ -211,7 +203,9 @@ int argconfig_parse(int argc, char *argv[], const char *program_desc,
 
 		s = &options[option_index];
 		value_addr = (void *)(char *)s->default_value;
-		if (s->config_type == CFG_STRING) {
+		if (s->config_type == CFG_NONE) {
+			*((uint8_t *) value_addr) = 1;
+		} else if (s->config_type == CFG_STRING) {
 			*((char **)value_addr) = optarg;
 		} else if (s->config_type == CFG_SIZE) {
 			*((size_t *) value_addr) = strtol(optarg, &endptr, 0);
