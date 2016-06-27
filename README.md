@@ -179,3 +179,33 @@ File: foo-plugin.c
 
 After that, you just need to implement the functions you defined in each
 ENTRY, then append the object file name to the Makefile's "OBJS".
+
+
+### Add an external plugin
+
+For some reason, maybe you have some special vendor specific or 3rd party
+extensions for your drive, but don't want your plug-in to be built into
+the program. That's okay.
+
+You can build these very similar to the previous section, "Add a new
+plugin". The difference is you use the macro "PLUGIN_EXT" since it is
+an external plugin. This macro will create and export the dyanmically
+loadable symbol named "nvme_ext_plugin" that's used to register the
+plug-in with the program. If you use the macro expansion code, you will
+need to copy the headers into your external project. Also, external
+extensions will need to bring their own command line parsing.
+
+Once you installed a plugin, the nvme-cli will load it each time it is
+invoked. The plug-in must be located in the same path as the nvme-cli. To
+help install, nvme-cli provides a "install-plugin" sub-command that
+will copy the file to the appropriate directory. You can always copy it
+manually if you know where your nvme-cli is installed.
+
+The following is a simple example building and installing a plugin called
+"nvmefoo".
+
+```
+# gcc -fpic -c nvmefoo.c
+# gcc -o libnvmefoo.so -shared nvmefoo.o
+# nvme install libnvmefoo.so
+```

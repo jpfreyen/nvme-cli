@@ -14,6 +14,9 @@ static int f(int argc, char **argv, struct command *command, struct plugin *plug
 #undef COMMAND_LIST
 #define COMMAND_LIST(args...) args
 
+#undef PLUGIN_EXT
+#define PLUGIN_EXT PLUGIN
+
 #undef PLUGIN
 #define PLUGIN(name, cmds) cmds
 
@@ -39,6 +42,9 @@ static struct command f ## _cmd = {	\
 #undef COMMAND_LIST
 #define COMMAND_LIST(args...) args
 
+#undef PLUGIN_EXT
+#define PLUGIN_EXT PLUGIN
+
 #undef PLUGIN
 #define PLUGIN(name, cmds) cmds
 
@@ -63,6 +69,9 @@ static struct command *commands[] = {	\
 	NULL,				\
 };
 
+#undef PLUGIN_EXT
+#define PLUGIN_EXT PLUGIN
+
 #undef PLUGIN
 #define PLUGIN(name, cmds) cmds
 
@@ -79,6 +88,13 @@ static struct command *commands[] = {	\
 
 #undef COMMAND_LIST
 #define COMMAND_LIST(args...)
+
+#undef PLUGIN_EXT
+#define PLUGIN_EXT(name, cmds)				\
+struct plugin nvme_ext_plugin __attribute__((used)) = {	\
+	name						\
+	.commands = commands				\
+};
 
 #undef PLUGIN
 #define PLUGIN(name, cmds)				\

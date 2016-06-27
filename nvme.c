@@ -24,6 +24,8 @@
  * This program uses NVMe IOCTLs to run native nvme commands to a device.
  */
 
+#include <dirent.h>
+#include <dlfcn.h>
 #include <endian.h>
 #include <errno.h>
 #include <getopt.h>
@@ -64,6 +66,7 @@
 static int fd;
 static struct stat nvme_stat;
 const char *devicename;
+static char plugin_dir[4096];
 
 static const char nvme_version_string[] = NVME_VERSION;
 
@@ -2602,6 +2605,108 @@ static int disconnect_cmd(int argc, char **argv, struct command *command, struct
 	return disconnect(desc, argc, argv);
 }
 
+static void close_plugin(struct plugin *plugin)
+{
+	dlclose(plugin->dlhandle);
+}
+
+static struct plugin *load_plugin(char *name)
+{
+	void *dlhandle;
+	struct plugin *plugin;
+
+	dlerror();
+	dlhandle = dlopen(name, RTLD_LAZY);
+	if (!dlhandle) {
+		printf("no dlopen...%s\n", dlerror());
+		return NULL;
+	}
+
+	plugin = dlsym(dlhandle, "nvme_ext_plugin");
+	if (!plugin) {
+		printf("no nvme_ext_plugin symbol...\n");
+		dlerror();
+		dlclose(dlhandle);
+		return NULL;
+	}
+	plugin->dlhandle = dlhandle;
+	return plugin;
+}
+
+static struct plugin *load_installed_plugin(char *name)
+{
+	char ppath[4096];
+
+	memset(ppath, 0, sizeof(ppath));
+	strcpy(ppath, plugin_dir);
+	strcat(ppath, name);
+
+	return load_plugin(ppath);
+}
+
+static bool is_shared(const char *str)
+{
+       static const char *so = ".so";
+       int lstr = strlen(str);
+       int lsuf = strlen(so);
+
+       if (lsuf > lstr)
+               return 0;
+
+       return strncmp(str + lstr - lsuf, so, lsuf) == 0;
+}
+
+static int install_plugin(int argc, char **argv, struct command *command, struct plugin *plugin)
+{
+	char *p;
+	struct plugin *new;
+	char file[4096];
+	char buffer[4096];
+	int src, dst, n;
+
+	if (argc < 2)
+		return EINVAL;
+
+	p = argv[1];
+	if (!is_shared(p))
+		return EINVAL;
+
+	new = load_plugin(p);
+	if (!new) {
+		fprintf(stderr, "%s does not appear to be an nvme plugin\n", p);
+		return EINVAL;
+	}
+
+	memset(file, 0, sizeof(file));
+	strcpy(file, plugin_dir);
+	strcat(file, basename(p));
+
+	src = open(p, O_RDONLY);
+	if (src < 0)
+		return EINVAL;
+
+	dst = open(file, O_WRONLY | O_CREAT | O_EXCL, S_IRWXU);
+	if (dst < 0) {
+		printf("%s already exists\n", basename(p));
+		return EINVAL;
+	}
+
+	while ((n = read(src, buffer, 4096)) > 0) {
+		n = write(dst, buffer, n);
+		if (n < 0) {
+			printf("error saving file\n");
+			break;
+		}
+	}
+	if (n >= 0)
+		printf("installed %s to %s\n", basename(p), plugin_dir);
+	else
+		fprintf(stderr, "failure installing %s to %s\n", basename(p), plugin_dir);
+
+	close_plugin(new);
+	return n < 0 ? EIO : 0;
+}
+
 void register_extension(struct plugin *plugin)
 {
 	plugin->parent = &nvme;
@@ -2610,11 +2715,38 @@ void register_extension(struct plugin *plugin)
 	nvme.extensions->tail = plugin;
 }
 
+static void load_plugins()
+{
+	struct plugin *plugin;
+	struct dirent *cur;
+	DIR *plugins;
+
+	readlink("/proc/self/exe", plugin_dir, sizeof(plugin_dir));
+	*(strrchr(plugin_dir, '/') + 1) = '\0';
+
+	plugins = opendir(plugin_dir);
+	if (!plugins)
+	        return;
+
+	while ((cur = readdir(plugins)) != NULL) {
+		if (cur->d_type != DT_REG)
+			continue;
+		if (!is_shared(cur->d_name))
+			continue;
+
+		plugin = load_installed_plugin(cur->d_name);
+		if (plugin)
+			register_extension(plugin);
+	}
+	closedir(plugins);
+}
+
 int main(int argc, char **argv)
 {
 	int ret;
 
 	nvme.extensions->parent = &nvme;
+	load_plugins();
 	if (argc < 2) {
 		general_help(&builtin);
 		return 0;
